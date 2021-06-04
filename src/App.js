@@ -1,8 +1,45 @@
 import React, { Component } from 'react'
-import { ApolloProvider } from 'react-apollo'
-import { Query } from 'react-apollo'
+import { ApolloProvider, Query, Mutation } from 'react-apollo'
 import client from './client'
-import { SERCHA_REPOSITORIES } from './graphql'
+import { SERCHA_REPOSITORIES, ADD_STAR, REMOVE_STAR } from './graphql'
+
+const StarButton = props => {
+  const { node, query, first, last, before, after } = props
+  const totalCount = node.stargazers.totalCount
+  const starCount = totalCount === 1 ? '1 star' : `${totalCount} stars`
+  const viewerHasStarred = node.viewerHasStarred
+  const StarStatus = ({addOrRemoveStar}) => {
+    return (
+      <button
+        onClick={
+          () => {
+            addOrRemoveStar({
+              variables: { input: {starrableId: node.id} }
+            })
+          }
+        }>
+        {starCount} | {viewerHasStarred ? 'starred' : '-'}
+      </button>
+    )
+  }
+
+  return (
+    <Mutation
+      mutation={viewerHasStarred ? REMOVE_STAR : ADD_STAR}
+      refetchQueries={ mutationResult => {
+          return [{
+            query: SERCHA_REPOSITORIES,
+            variables: { query, first, last, before, after }
+          }]
+        }
+      }
+    >
+      {
+        addOrRemoveStar => <StarStatus addOrRemoveStar={addOrRemoveStar} />
+      }
+    </Mutation>
+  )
+}
 
 const PER_PAGE = 5
 
@@ -81,6 +118,8 @@ class App extends Component {
                         return (
                           <li key={node.id}>
                             <a href={node.url} target="_blank" rel="noopener noreferrer">{node.name}</a>
+                            &nbsp;
+                            <StarButton node={node} {...{ query, first, last, before, after }} />
                           </li>
                         )
                       })
