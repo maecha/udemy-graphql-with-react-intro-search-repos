@@ -14,7 +14,26 @@ const StarButton = props => {
         onClick={
           () => {
             addOrRemoveStar({
-              variables: { input: {starrableId: node.id} }
+              variables: { input: {starrableId: node.id} },
+              update: (store, { data: { addStar, removeStar } }) => {
+                const { starrable } = addStar || removeStar
+                const data = store.readQuery({
+                  query: SERCHA_REPOSITORIES,
+                  variables: { query, first, last, after, before }
+                })
+                const edges = data.search.edges
+                const newEdges = edges.map(edge => {
+                  if (edge.node.id === node.id) {
+                    const totalCount = edge.node.stargazers.totalCount
+                    const diff = starrable.viewerHasStarred ? 1 : -1
+                    const newTotalCount = totalCount + diff
+                    edge.node.stargazers.totalCount = newTotalCount
+                  }
+                  return edges
+                })
+                data.search.edges = newEdges
+                store.writeQuery({ query: SERCHA_REPOSITORIES, data })
+              }
             })
           }
         }>
@@ -26,13 +45,6 @@ const StarButton = props => {
   return (
     <Mutation
       mutation={viewerHasStarred ? REMOVE_STAR : ADD_STAR}
-      refetchQueries={ mutationResult => {
-          return [{
-            query: SERCHA_REPOSITORIES,
-            variables: { query, first, last, before, after }
-          }]
-        }
-      }
     >
       {
         addOrRemoveStar => <StarStatus addOrRemoveStar={addOrRemoveStar} />
@@ -48,7 +60,7 @@ const DEFAULT_STATE = {
   "after": null,
   "last": null,
   "before": null,
-  "query": "フロントエンドエンジニア"
+  "query": ""
 }
 
 class App extends Component {
@@ -56,18 +68,16 @@ class App extends Component {
     super(props)
 
     this.state = DEFAULT_STATE
-    this.handleChange = this.handleChange.bind(this)
-  }
-
-  handleChange(event) {
-    this.setState({
-      ...DEFAULT_STATE,
-      query: event.target.value
-    })
+    this.myRef = React.createRef()
+    this.handleSubmit = this.handleSubmit.bind(this)
   }
 
   handleSubmit(event) {
     event.preventDefault()
+
+    this.setState({
+      query: this.myRef.current.value
+    })
   }
 
   goPrev(search) {
@@ -93,7 +103,8 @@ class App extends Component {
     return (
       <ApolloProvider client={client}>
         <form onSubmit={this.handleSubmit}>
-          <input value={query} onChange={this.handleChange} />
+          <input ref={this.myRef} />
+          <input type="submit" value="Submit" />
         </form>
         <Query
           query={SERCHA_REPOSITORIES}
